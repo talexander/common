@@ -242,6 +242,45 @@ class <proxyShortClassName> extends \<className> implements \<baseProxyInterface
         $this->proxyClassTemplate = (string) $proxyClassTemplate;
     }
 
+    /**
+     * Generates a proxy class file.
+     *
+     * @param  \Doctrine\Common\Persistence\Mapping\ClassMetadata  $class    Metadata for the original class
+     * @param  string         $fileName Filename (full path) for the generated class
+     * @param  string         $file     The proxy class template data
+     *
+     * @throws UnexpectedValueException
+     */
+    public function generateProxyClass(ClassMetadata $class, $fileName = null, $file = null)
+    {
+        $placeholders = array();
+
+        preg_match_all('(<([a-zA-Z]+)>)', $this->proxyClassTemplate, $placeholderMatches);
+        $placeholderMatches = array_combine($placeholderMatches[0], $placeholderMatches[1]);
+
+        foreach ($placeholderMatches as $placeholder => $name) {
+            $placeholders[$placeholder] = isset($this->placeholders[$name])
+                ? $this->placeholders[$name]
+                : call_user_func(array($this, "generate" . $name), $class);
+        }
+
+        $fileName = $fileName ?: $this->getProxyFileName($class->getName());
+        $file = $file ? $file : $this->proxyClassTemplate;
+        $file = strtr($file, $placeholders);
+
+        $parentDirectory = dirname($fileName);
+
+        if ( ! is_dir($parentDirectory) && (false === @mkdir($parentDirectory, 0775, true))) {
+            throw UnexpectedValueException::proxyDirectoryNotWritable();
+        } elseif ( ! is_writable($parentDirectory)) {
+            throw UnexpectedValueException::proxyDirectoryNotWritable();
+        }
+
+        $tmpFileName = $fileName . '.' . uniqid('', true);
+        file_put_contents($tmpFileName, $file);
+        rename($tmpFileName, $fileName);
+    }
+
     private function generateProxyClassName(ClassMetadata $class)
     {
         return ClassUtils::generateProxyClassName($class->getName(), $this->proxyNamespace);
@@ -254,7 +293,7 @@ class <proxyShortClassName> extends \<className> implements \<baseProxyInterface
      *
      * @return string
      */
-    public function generateProxyShortClassName(ClassMetadata $class)
+    private function generateProxyShortClassName(ClassMetadata $class)
     {
         $proxyClassName = ClassUtils::generateProxyClassName($class->getName(), $this->proxyNamespace);
         $parts          = explode('\\', strrev($proxyClassName), 2);
@@ -269,7 +308,7 @@ class <proxyShortClassName> extends \<className> implements \<baseProxyInterface
      *
      * @return string
      */
-    public function generateNamespace(ClassMetadata $class)
+    private function generateNamespace(ClassMetadata $class)
     {
         $proxyClassName = ClassUtils::generateProxyClassName($class->getName(), $this->proxyNamespace);
         $parts = explode('\\', strrev($proxyClassName), 2);
@@ -284,7 +323,7 @@ class <proxyShortClassName> extends \<className> implements \<baseProxyInterface
      *
      * @return string
      */
-    public function generateClassName(ClassMetadata $class)
+    private function generateClassName(ClassMetadata $class)
     {
         return ltrim($class->getName(), '\\');
     }
@@ -296,7 +335,7 @@ class <proxyShortClassName> extends \<className> implements \<baseProxyInterface
      *
      * @return string
      */
-    public function generateLazyPropertiesDefaults(ClassMetadata $class)
+    private function generateLazyPropertiesDefaults(ClassMetadata $class)
     {
         $lazyPublicProperties = $this->getLazyLoadedPublicProperties($class);
         $values               = array();
@@ -315,7 +354,7 @@ class <proxyShortClassName> extends \<className> implements \<baseProxyInterface
      *
      * @return string
      */
-    public function generateConstructorImpl(ClassMetadata $class)
+    private function generateConstructorImpl(ClassMetadata $class)
     {
         $constructorImpl = <<<'EOT'
     /**
@@ -350,7 +389,7 @@ EOT;
      *
      * @return string
      */
-    public function generateMagicGet(ClassMetadata $class)
+    private function generateMagicGet(ClassMetadata $class)
     {
         $lazyPublicProperties = array_keys($this->getLazyLoadedPublicProperties($class));
         $hasParentGet         = $class->getReflectionClass()->hasMethod('__get');
@@ -408,7 +447,7 @@ EOT;
      *
      * @return string
      */
-    public function generateMagicSet(ClassMetadata $class)
+    private function generateMagicSet(ClassMetadata $class)
     {
         $lazyPublicProperties = $this->getLazyLoadedPublicProperties($class);
         $hasParentSet         = $class->getReflectionClass()->hasMethod('__set');
@@ -465,7 +504,7 @@ EOT;
      *
      * @return string
      */
-    public function generateMagicIsset(ClassMetadata $class)
+    private function generateMagicIsset(ClassMetadata $class)
     {
         $lazyPublicProperties = array_keys($this->getLazyLoadedPublicProperties($class));
         $hasParentIsset       = $class->getReflectionClass()->hasMethod('__isset');
@@ -519,7 +558,7 @@ EOT;
      *
      * @return string
      */
-    public function generateSleepImpl(ClassMetadata $class)
+    private function generateSleepImpl(ClassMetadata $class)
     {
         $hasParentSleep = $class->getReflectionClass()->hasMethod('__sleep');
         $inheritDoc     = $hasParentSleep ? '{@inheritDoc}' : '';
@@ -584,7 +623,7 @@ EOT;
      *
      * @return string
      */
-    public function generateWakeupImpl(ClassMetadata $class)
+    private function generateWakeupImpl(ClassMetadata $class)
     {
         $unsetPublicProperties = array();
         $hasWakeup             = $class->getReflectionClass()->hasMethod('__wakeup');
@@ -639,7 +678,7 @@ EOT;
      *
      * @return string
      */
-    public function generateCloneImpl(ClassMetadata $class)
+    private function generateCloneImpl(ClassMetadata $class)
     {
         $hasParentClone  = $class->getReflectionClass()->hasMethod('__clone');
         $inheritDoc      = $hasParentClone ? '{@inheritDoc}' : '';
@@ -663,7 +702,7 @@ EOT;
      *
      * @return string
      */
-    public function generateMethods(ClassMetadata $class)
+    private function generateMethods(ClassMetadata $class)
     {
         $methods           = '';
         $methodNames       = array();
@@ -786,45 +825,6 @@ EOT;
 
         return rtrim($baseDirectory, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . Proxy::MARKER
             . str_replace('\\', '', $className) . '.php';
-    }
-
-    /**
-     * Generates a proxy class file.
-     *
-     * @param  \Doctrine\Common\Persistence\Mapping\ClassMetadata  $class    Metadata for the original class
-     * @param  string         $fileName Filename (full path) for the generated class
-     * @param  string         $file     The proxy class template data
-     *
-     * @throws UnexpectedValueException
-     */
-    public function generateProxyClass(ClassMetadata $class, $fileName = null, $file = null)
-    {
-        $placeholders = array();
-
-        preg_match_all('(<([a-zA-Z]+)>)', $this->proxyClassTemplate, $placeholderMatches);
-        $placeholderMatches = array_combine($placeholderMatches[0], $placeholderMatches[1]);
-
-        foreach ($placeholderMatches as $placeholder => $name) {
-            $placeholders[$placeholder] = isset($this->placeholders[$name])
-                ? $this->placeholders[$name]
-                : call_user_func(array($this, "generate" . $name), $class);
-        }
-
-        $fileName = $fileName ?: $this->getProxyFileName($class->getName());
-        $file = $file ? $file : $this->proxyClassTemplate;
-        $file = strtr($file, $placeholders);
-
-        $parentDirectory = dirname($fileName);
-
-        if ( ! is_dir($parentDirectory) && (false === @mkdir($parentDirectory, 0775, true))) {
-            throw UnexpectedValueException::proxyDirectoryNotWritable();
-        } elseif ( ! is_writable($parentDirectory)) {
-            throw UnexpectedValueException::proxyDirectoryNotWritable();
-        }
-
-        $tmpFileName = $fileName . '.' . uniqid('', true);
-        file_put_contents($tmpFileName, $file);
-        rename($tmpFileName, $fileName);
     }
 
     /**

@@ -288,11 +288,6 @@ class <proxyShortClassName> extends \<className> implements \<baseProxyInterface
         rename($tmpFileName, $fileName);
     }
 
-    private function generateProxyClassName(ClassMetadata $class)
-    {
-        return ClassUtils::generateProxyClassName($class->getName(), $this->proxyNamespace);
-    }
-
     /**
      * Generates the proxy short class name to be used in the template
      *

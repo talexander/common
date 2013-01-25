@@ -22,6 +22,7 @@ namespace Doctrine\Common\Proxy;
 use Doctrine\Common\Proxy\Exception\InvalidArgumentException;
 use Doctrine\Common\Util\ClassUtils;
 use Doctrine\Common\Persistence\ObjectManager;
+use Doctrine\Common\Persistence\Mapping\ClassMetadata;
 
 /**
  * Abstract factory for proxy objects.

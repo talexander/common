@@ -104,6 +104,7 @@ abstract class AbstractProxyFactory
             }
 
             $proxyFileName = $generator->getProxyFileName($class->getName(), $proxyDir);
+
             $generator->generateProxyClass($class, $proxyFileName);
 
             $generated += 1;
@@ -148,6 +149,7 @@ abstract class AbstractProxyFactory
             $className     = $classMetadata->getName(); // make sure case-sensitivy is correct
 
             $this->definitions[$className] = $this->createProxyDefinition($className);
+
             $proxyClassName = $this->definitions[$className]->proxyClassName;
 
             if ( ! class_exists($proxyClassName, false)) {

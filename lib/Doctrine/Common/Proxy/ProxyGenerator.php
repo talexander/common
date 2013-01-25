@@ -247,26 +247,32 @@ class <proxyShortClassName> extends \<className> implements \<baseProxyInterface
      *
      * @param  \Doctrine\Common\Persistence\Mapping\ClassMetadata  $class    Metadata for the original class
      * @param  string         $fileName Filename (full path) for the generated class
-     * @param  string         $file     The proxy class template data
      *
      * @throws UnexpectedValueException
      */
-    public function generateProxyClass(ClassMetadata $class, $fileName = null, $file = null)
+    public function generateProxyClass(ClassMetadata $class, $fileName = null)
     {
-        $placeholders = array();
-
         preg_match_all('(<([a-zA-Z]+)>)', $this->proxyClassTemplate, $placeholderMatches);
+
         $placeholderMatches = array_combine($placeholderMatches[0], $placeholderMatches[1]);
+        $placeholders       = array();
 
         foreach ($placeholderMatches as $placeholder => $name) {
             $placeholders[$placeholder] = isset($this->placeholders[$name])
                 ? $this->placeholders[$name]
-                : call_user_func(array($this, "generate" . $name), $class);
+                : array($this, "generate" . $name);
         }
 
-        $fileName = $fileName ?: $this->getProxyFileName($class->getName());
-        $file = $file ? $file : $this->proxyClassTemplate;
-        $file = strtr($file, $placeholders);
+        $placeholders = array_map(function ($value) use ($class) {
+            if (is_callable($value)) {
+                return call_user_func($value, $class);
+            }
+
+            return $value;
+        }, $placeholders);
+
+        $fileName  = $fileName ?: $this->getProxyFileName($class->getName());
+        $proxyCode = strtr($this->proxyClassTemplate, $placeholders);
 
         $parentDirectory = dirname($fileName);
 
@@ -277,7 +283,8 @@ class <proxyShortClassName> extends \<className> implements \<baseProxyInterface
         }
 
         $tmpFileName = $fileName . '.' . uniqid('', true);
-        file_put_contents($tmpFileName, $file);
+
+        file_put_contents($tmpFileName, $proxyCode);
         rename($tmpFileName, $fileName);
     }
 

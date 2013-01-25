@@ -103,9 +103,9 @@ abstract class AbstractProxyFactory
                 continue;
             }
 
-            $proxyFileName = $generator->getProxyFileName($class->getName(), $proxyDir);
+            $proxyFileName = $this->proxyGenerator->getProxyFileName($class->getName(), $proxyDir);
 
-            $generator->generateProxyClass($class, $proxyFileName);
+            $this->proxyGenerator->generateProxyClass($class, $proxyFileName);
 
             $generated += 1;
         }
@@ -153,11 +153,10 @@ abstract class AbstractProxyFactory
             $proxyClassName = $this->definitions[$className]->proxyClassName;
 
             if ( ! class_exists($proxyClassName, false)) {
-                $generator = $this->getProxyGenerator();
-                $fileName  = $generator->getProxyFileName($className);
+                $fileName  = $this->proxyGenerator->getProxyFileName($className);
 
                 if ($this->autoGenerate) {
-                    $generator->generateProxyClass($classMetadata);
+                    $this->proxyGenerator->generateProxyClass($classMetadata);
                 }
 
                 require $fileName;
